@@ -1,4 +1,4 @@
-// components/SessionWrapper.tsx
+// components/ui/SessionWrapper.tsx
 "use client"
 
 import { SessionProvider } from "next-auth/react"

@@ -3,6 +3,8 @@ import type { NextAuthOptions } from "next-auth"
 import GoogleProvider from "next-auth/providers/google"
 import GitHubProvider from "next-auth/providers/github"
 import CredentialsProvider from "next-auth/providers/credentials"
+import clientPromise from "@/lib/mongodb"
+import { compare } from "bcryptjs"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -21,17 +23,20 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (
-          credentials?.email === "demo@example.com" &&
-          credentials?.password === "password"
-        ) {
-          return {
-            id: "1",
-            name: "Demo User",
-            email: credentials.email,
-          }
+        const client = await clientPromise
+        const db = client.db("blogspace")
+
+        const user = await db.collection("users").findOne({ email: credentials?.email })
+        if (!user) throw new Error("No user found with this email")
+
+        const isValid = await compare(credentials!.password, user.password)
+        if (!isValid) throw new Error("Invalid password")
+
+        return {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
         }
-        return null
       },
     }),
   ],
@@ -44,7 +49,9 @@ export const authOptions: NextAuthOptions = {
       return token
     },
     async session({ session, token }) {
-      if (token && session.user) session.user.id = token.id as string
+      if (token && session.user) {
+        session.user.id = token.id as string
+      }
       return session
     },
   },

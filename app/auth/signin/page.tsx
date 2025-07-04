@@ -1,7 +1,7 @@
-'use client'
+"use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { signIn } from "next-auth/react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,9 @@ import { Github, Mail, ArrowLeft } from "lucide-react"
 
 export default function SignInPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = searchParams.get("callbackUrl") || "/"
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -25,15 +28,20 @@ export default function SignInPage() {
       email,
       password,
       redirect: false,
+      callbackUrl,
     })
 
     setIsLoading(false)
 
     if (res?.ok) {
-      router.push("/")
+      router.push(callbackUrl)
     } else {
       alert("Login failed. Check your credentials.")
     }
+  }
+
+  const handleSocialSignIn = (provider: "google" | "github") => {
+    signIn(provider, { callbackUrl })
   }
 
   return (
@@ -49,11 +57,11 @@ export default function SignInPage() {
             <CardDescription>Use your credentials or social login</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={() => signIn("google")} className="w-full" variant="outline">
+            <Button onClick={() => handleSocialSignIn("google")} className="w-full" variant="outline">
               <Mail className="h-4 w-4 mr-2" />
               Continue with Google
             </Button>
-            <Button onClick={() => signIn("github")} className="w-full" variant="outline">
+            <Button onClick={() => handleSocialSignIn("github")} className="w-full" variant="outline">
               <Github className="h-4 w-4 mr-2" />
               Continue with GitHub
             </Button>
@@ -73,6 +81,16 @@ export default function SignInPage() {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
+
+            <div className="text-center text-sm">
+              Don’t have an account?{" "}
+              <Link
+                href={`/auth/signup?callbackUrl=${encodeURIComponent(callbackUrl)}`}
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Sign up
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </div>

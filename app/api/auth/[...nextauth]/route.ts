@@ -1,55 +1,51 @@
-import { type NextRequest, NextResponse } from "next/server"
-import { getToken } from "next-auth/jwt"
-import { createBlogPost, getBlogPosts } from "@/lib/blog"
+import NextAuth from "next-auth"
+import CredentialsProvider from "next-auth/providers/credentials"
+// your DB config
+import clientPromise from "@/lib/mongodb"
+import { compare } from "bcrypt"
 
-const secret = process.env.NEXTAUTH_SECRET!
+const handler = NextAuth({
+  providers: [
+    CredentialsProvider({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        const client = await clientPromise
+        const db = client.db("blogspace")
+        const user = await db.collection("users").findOne({ email: credentials?.email })
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const limit = Number.parseInt(searchParams.get("limit") || "10")
-  const skip = Number.parseInt(searchParams.get("skip") || "0")
-  const category = searchParams.get("category") || undefined
+        if (!user) throw new Error("No user found")
+        const isValid = await compare(credentials!.password, user.password)
+        if (!isValid) throw new Error("Invalid password")
 
-  try {
-    const posts = await getBlogPosts(limit, skip, category)
-    return NextResponse.json(posts)
-  } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch blog posts" }, { status: 500 })
-  }
-}
+        return {
+          id: user._id.toString(),
+          name: user.name,
+          email: user.email,
+        }
+      },
+    }),
+  ],
+  pages: {
+    signIn: "/auth/signin",
+  },
+  session: {
+    strategy: "jwt",
+  },
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) token.user = user
+      return token
+    },
+    async session({ session, token }) {
+      session.user = token.user
+      return session
+    },
+  },
+  secret: process.env.NEXTAUTH_SECRET,
+})
 
-export async function POST(request: NextRequest) {
-  const token = await getToken({ req: request, secret })
-
-  if (!token) {
-    return NextResponse.json({ error: "Authentication required" }, { status: 401 })
-  }
-
-  try {
-    const body = await request.json()
-    const { title, content, category, tags } = body
-
-    if (!title || !content) {
-      return NextResponse.json({ error: "Title and content are required" }, { status: 400 })
-    }
-
-    const excerpt = content.substring(0, 200) + "..."
-
-    const newPost = {
-      title,
-      content,
-      excerpt,
-      author: token.name || "Anonymous",
-      authorId: token.id,
-      category: category || "Uncategorized",
-      tags: tags || [],
-      published: true,
-    }
-
-    const result = await createBlogPost(newPost)
-    return NextResponse.json({ success: true, id: result.insertedId })
-  } catch (error) {
-    console.error("Publish error:", error)
-    return NextResponse.json({ error: "Failed to publish blog post" }, { status: 500 })
-  }
-}
+export { handler as GET, handler as POST }

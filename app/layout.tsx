@@ -1,7 +1,7 @@
 // app/layout.tsx
 import "./globals.css"
 import { Inter } from "next/font/google"
-import SessionWrapper from "../components/ui/sessionwrapper"
+import SessionWrapper from "../components/ui/SessionWrapper"
 
 const inter = Inter({ subsets: ["latin"] })
 
