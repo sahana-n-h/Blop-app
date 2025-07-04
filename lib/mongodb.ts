@@ -1,10 +1,12 @@
-import { MongoClient } from "mongodb"
+// lib/mongodb.ts
+
+import { MongoClient, Db } from "mongodb"
 
 const uri = process.env.MONGODB_URI
 const options = {}
 
 if (!uri) {
-  throw new Error('❌ Missing MONGODB_URI in environment')
+  throw new Error("❌ Missing MONGODB_URI in environment")
 }
 
 let client
@@ -26,3 +28,9 @@ if (process.env.NODE_ENV === "development") {
 }
 
 export default clientPromise
+
+// ✅ Helper to get DB directly
+export async function connectToDatabase(): Promise<Db> {
+  const client = await clientPromise
+  return client.db() // optionally pass your DB name like: client.db("blogDB")
+}

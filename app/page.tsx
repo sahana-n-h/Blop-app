@@ -1,44 +1,34 @@
 "use client"
 
 import Link from "next/link"
-import { useSession } from "next-auth/react"
+import { useSession, signOut } from "next-auth/react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { CalendarDays, User, ArrowRight, PenTool } from "lucide-react"
 
-const featuredPosts = [
-  {
-    id: "1",
-    title: "Getting Started with Next.js 15",
-    excerpt: "Learn the latest features and improvements in Next.js 15, including enhanced performance and new developer tools.",
-    author: "John Doe",
-    date: "2024-01-15",
-    category: "Technology",
-    readTime: "5 min read",
-  },
-  {
-    id: "2",
-    title: "The Future of Web Development",
-    excerpt: "Exploring emerging trends and technologies that will shape the future of web development in 2024 and beyond.",
-    author: "Jane Smith",
-    date: "2024-01-12",
-    category: "Web Development",
-    readTime: "8 min read",
-  },
-  {
-    id: "3",
-    title: "Building Scalable Applications",
-    excerpt: "Best practices and architectural patterns for building applications that can scale with your growing user base.",
-    author: "Mike Johnson",
-    date: "2024-01-10",
-    category: "Architecture",
-    readTime: "12 min read",
-  },
-]
-
 export default function HomePage() {
   const { data: session } = useSession()
+
+  const [latestPosts, setLatestPosts] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchLatest = async () => {
+      try {
+        const res = await fetch("/api/blogs?limit=3")
+        const data = await res.json()
+        setLatestPosts(data)
+      } catch (error) {
+        console.error("Failed to load latest posts", error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchLatest()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -54,15 +44,21 @@ export default function HomePage() {
             <Link href="/about" className="text-gray-600 hover:text-gray-900 transition-colors">About</Link>
           </nav>
           <div className="flex items-center space-x-3">
-            <Link href={session ? "/create" : "/auth/signin"}>
+            {/* <Link href={session ? "/create" : "/auth/signin?callbackUrl=/create"}>
               <Button variant="outline" size="sm" className="hidden sm:flex items-center gap-2 bg-transparent">
                 <PenTool className="h-4 w-4" />
                 Write
               </Button>
-            </Link>
-            <Link href="/auth/signin">
-              <Button size="sm">Sign In</Button>
-            </Link>
+            </Link> */}
+            {!session ? (
+              <Link href="/auth/signin">
+                <Button size="sm">Sign In</Button>
+              </Link>
+            ) : (
+              <Button size="sm" variant="outline" onClick={() => signOut({ callbackUrl: "/" })}>
+                Log Out
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -83,7 +79,7 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </Link>
-            <Link href={ "/auth/signin?callbackUrl=/create"}>
+            <Link href={session ? "/create" : "/auth/signin?callbackUrl=/create"}>
               <Button size="lg" variant="outline">
                 Start Writing 
               </Button>
@@ -92,41 +88,41 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Posts */}
+      {/* Featured Posts - Latest Blogs */}
       <section className="py-16 px-4">
         <div className="container mx-auto">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Featured Posts</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Latest Posts</h2>
             <p className="text-gray-600 max-w-2xl mx-auto">
-              Discover the latest and most popular articles from our community of writers
+              Discover the most recent blog posts published on BlogSpace.
             </p>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {featuredPosts.map((post) => (
-              <Card key={post.id} className="group hover:shadow-lg transition-all duration-300 border-0 shadow-md">
+            {latestPosts.map((post) => (
+              <Card key={post._id || post.id} className="group hover:shadow-lg transition-all duration-300 border-0 shadow-md">
                 <CardHeader>
                   <div className="flex items-center justify-between mb-2">
-                    <Badge variant="secondary" className="text-xs">{post.category}</Badge>
-                    <span className="text-sm text-gray-500">{post.readTime}</span>
+                    <Badge variant="secondary" className="text-xs">{post.category || "General"}</Badge>
+                    <span className="text-sm text-gray-500">{post.readTime || "5 min read"}</span>
                   </div>
                   <CardTitle className="group-hover:text-blue-600 transition-colors line-clamp-2">
                     {post.title}
                   </CardTitle>
-                  <CardDescription className="line-clamp-3">{post.excerpt}</CardDescription>
+                  <CardDescription className="line-clamp-3">{post.excerpt || post.content?.slice(0, 100)}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="flex items-center justify-between text-sm text-gray-500">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4" />
-                      <span>{post.author}</span>
+                      <span>{post.author || "Anonymous"}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <CalendarDays className="h-4 w-4" />
-                      <span>{new Date(post.date).toLocaleDateString()}</span>
+                      <span>{new Date(post.date || post.createdAt).toLocaleDateString()}</span>
                     </div>
                   </div>
-                  <Link href={`/blog/${post.id}`}>
+                  <Link href={`/blog/${post._id || post.id}`}>
                     <Button variant="ghost" className="w-full mt-4 group-hover:bg-blue-50 group-hover:text-blue-600">
                       Read More
                       <ArrowRight className="ml-2 h-4 w-4" />
@@ -147,11 +143,11 @@ export default function HomePage() {
           <p className="text-xl text-blue-100 mb-8 max-w-2xl mx-auto">
             Join thousands of writers who trust BlogSpace to share their ideas with the world.
           </p>
-          <Link href={session ?  "/auth/signin":"/create"}>
+          {/* <Link href={session ? "/create" : "/auth/signin?callbackUrl=/create"}>
             <Button size="lg" variant="secondary" className="bg-white text-blue-600 hover:bg-gray-100">
               Join US!
             </Button>
-          </Link>
+          </Link> */}
         </div>
       </section>
 
